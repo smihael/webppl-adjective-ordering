@@ -1,0 +1,27 @@
+{
+  "name": "adjective_ordering",
+  "author": {
+    "name": "Mihael Simonič",
+    "email": "smihael@gmail.com"
+  },
+  "version": "0.0.1",
+  "description": "WebPPL library with helper functions for my master thesis",
+  "webppl": {
+    "wppl": ["src/helper.wppl", "src/core.wppl"]
+  },
+  "main": "src/combinatorics.js",
+  "dependencies": {
+    "webppl": "^0.9.0",
+    "js-combinatorics": "^0.5.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smihael/msc-thesis.git"
+  },
+  "homepage": "https://github.com/smihael/msc-thesis",
+  "scripts": {
+    "debug": "node debug `which webppl` adjective_ordering.wppl --require . --require webppl-viz",
+    "run": "export WEBPPL_VIZ_AUTOOPEN=1 && webppl adjective_ordering.wppl --require . --require webppl-viz"
+  },
+  "license": "GPL-3.0-or-later"
+}

@@ -1,0 +1,27 @@
+/**
+ * @file Basic experiment
+ */
+
+globalStore.config = {
+  sample_contexts: false, //if true, size of the context will be sampled 
+  min_context_size: 4, 
+  max_context_size: 10, 
+  default_context_size: 4  
+}
+
+// obj:    0 | 1 | 2 | 3 | 4 
+// shaggy: + | + | - | - | -
+// nice:   + | - | + | - | -
+
+var words = [{subjectivity: 0.2, speakerExtension : [0,1]}, //shaggy
+             {subjectivity: 0.6, speakerExtension : [0,2]}  //nice
+            ]
+
+var sampleSequence = function() {
+  // (0,1): nice shaggy 
+  // (1,0): shaggy nice  
+  return uniformDraw([[0,1], [1,0]]) 
+}
+
+// speaker wants to point to object 0 (shaggy and nice), optimality is 10
+viz(speaker(0, words, 1)) 

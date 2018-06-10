@@ -1,0 +1,130 @@
+/**
+ * @file Experiment: add negations, sample speaker extension
+ */
+
+
+globalStore.config = {
+  negation: true,  // if true, enable automatic adding of negations to the extension
+  combinations: true,   // if true, enable phrases consisting just of a subset of adjective as well
+  sample_contexts: true, //if true, size of the context will be sampled 
+  min_context_size: 4, 
+  max_context_size: 10, 
+  default_context_size: 4  
+}
+
+// Return vocabulary with negations of the given basic words. 
+var addNegations = function (basicWords, globalContext) {
+  var full_vocab = cloneArray(basicWords);
+  // add negations of the given basic words
+  foreach(basicWords, function (word) {
+    full_vocab.push({
+      subjectivity: word.subjectivity,
+      // negation is essentially a set complement operation on extension 
+      speakerExtension: _.difference(globalContext, word.speakerExtension) 
+    })
+  });
+  return full_vocab;
+}
+
+// If we allow speaker to utter expressions including negation of adjectives, we have to take care that he can't say something shaggy not shaggy
+var sampleSequence = function (words) {
+  if (globalStore.config.negation) { 
+    var nWords = words.length;
+    //first half of the words object are our basic words,  the rest are negations
+    var basicIndices = _.range(nWords / 2);
+    var negationIndices = _.range(nWords / 2, nWords);
+    //generate all possible combinations (one or two word) of different permutations (different orderings)
+    var basicOrderings = permutationCombination(basicIndices);
+    // add only non conflicting orderings for all negations
+    // in order to avoid phrases like "nice not nice", but allow "nice not shaggy",
+    // we take basic orderings and replace indices of basic words by the indices of their negated pairs
+    var allOrderings = [basicOrderings];
+    foreach(negationIndices,
+      function (negIndex) {
+        // if we have following words [shaggy, nice, not shaggy, not nice], then
+        // given the index of "not nice" is 3, thr index of "nice" is 1
+        var origIndex = negIndex - nWords / 2;
+        allOrderings.push(replaceAllArray(basicOrderings,origIndex,negIndex));
+      })
+    //lastly we need to add negative only combinations
+    allOrderings.push(permutationCombination(negationIndices))
+    //remove repetitions 
+    var sequences = _.uniqWith(_.flatten(allOrderings), _.isEqual);
+    // and draw one sample
+    return uniformDraw(sequences);
+  } else { // if only the basic set of words can be uttered
+    var nWords = words.length;
+    var basicIndices = _.range(nWords);
+    var basicOrderings = globalStore.config.combinations ? permutationCombination(basicIndices) : permutation(basicIndices);
+    return uniformDraw(basicOrderings);
+  }
+}
+
+// Speaker (S)
+var speaker = cache ( function (object, words_used, globalContext, alpha) {
+  Infer({
+    method: 'enumerate',
+    model: function () {
+      // draw one of the possible orderings for the given words
+      var sequence = sampleSequence(words_used);
+      // we remap words so that they appear in the same order as in the drawn sequence
+      var noun_phrase = map(function(i){words_used[i]}, sequence)
+      // get the logscore for the utterance
+      factor(alpha * LL(globalContext, noun_phrase).score(object))
+      return _.toString(sequence) // like utterance 
+    }
+  })
+})
+
+
+var sampleSpeakerExtension = function(context) {
+  var ext = powerSet(context.slice(1)) // extension can be essentially any combination of objects
+  var target_ext = flatten(cartesianProduct([0],ext)) // add target object to all extensions and correct nesting
+  return uniformDraw(target_ext) 
+ }
+
+
+var possibleSituations = function() {
+  Infer({
+    method: 'enumerate',
+    //method: 'MCMC',
+    //samples: 1000,
+    model: function() {
+      // sample global context
+      var globalContext = sampleGlobalContext();
+
+      // adjectives
+      var words = [
+        { subjectivity: 0.2, speakerExtension: sampleSpeakerExtension(globalContext) }, //shaggy
+        { subjectivity: 0.4, speakerExtension: sampleSpeakerExtension(globalContext) }  //nice
+      ];
+
+      // if we allow speaker to utter negations of the adjectives, there are more ordering sequences to consider
+      var words_used =  globalStore.config.negation ? addNegations(words, globalContext) : words;
+
+      var optimality = 10;
+      var targetObj = 0;
+      var speaker_utterancesDist_obj0 = speaker(targetObj, words_used, globalContext, optimality);
+      var preferred_utterance  = stateMax(speaker_utterancesDist_obj0)
+
+      var hypothesis_success = speaker_utterancesDist_obj0.score('0,1') > speaker_utterancesDist_obj0.score('1,0')
+      csv.writeLine([hypothesis_success,globalContext.length,preferred_utterance.state,words[0].speakerExtension,words[1].speakerExtension,words[0].subjectivity,words[1].subjectivity].join('\t'), output_handle);
+
+      //return sample(speaker_utterancesDist_obj0) 
+      return preferred_utterance.state
+
+    }
+  })
+}
+
+
+
+var output_handle = csv.open("ex3_log_all.tsv");
+csv.writeLine(["success","context size", "preferred ordering", "speaker's extension for the first word", "speaker's extension for the second word", "subjectivitiy of the first world", "subjectivity of the second word"].join('\t'), output_handle);
+display("sampling situations first, then testing speaker in each of them")
+var res = possibleSituations()
+display(res)
+viz(res)
+csv.close(output_handle)
+
+

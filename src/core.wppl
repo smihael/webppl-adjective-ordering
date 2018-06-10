@@ -1,0 +1,84 @@
+/**
+ * @file Shared core functions
+ */
+
+
+/**
+ * Sample global context.
+ * If varying context size is enabled, this will sample context size and return a context 
+ * of a corresponding size (i.e. list of indices from 0 to n). 
+ * @returns {number[]} list of indices
+ */
+var sampleGlobalContext = function () {
+    return globalStore.config.sample_contexts ?
+        _.range(uniformDraw(_.range(globalStore.config.min_context_size, globalStore.config.max_context_size + 1))) :
+        _.range(globalStore.config.default_context_size);
+}
+
+/**
+ * Sequential context update.
+ * @param  {number[]} context   object indices to consider
+ * @param  {number[]} extension object indices that apply to a certain word
+ * @return {number[]}           intersection of both sets
+ */
+var updateContext = function (context, extension) {
+    return _.intersection(extension, context)
+}
+
+/**
+ * Sample listener's extension.
+ * Extension tells us which objects are meant by the listener when he makes an utterance.
+ * It's represented as an array of context indices. Here we uniformly draw from any combination of indices.
+ * @param  context              current context to consider
+ * @return {number[]}           extension
+ */
+var sampleListenerExtension = function (context) {
+    return uniformDraw(psne(context))
+}
+
+/**
+ * Worker function for literal listener. Returns literal listener's pick.
+ * @param {number[]} context object indices that need to be considered
+ * @param {object[]} words vocabulary object
+ * @param {number[]} originalContext same as context, used to store original context throughout recursion 
+ * @returns {number} chosen object index 
+ */
+var literalListener = function (context, words, originalContext) {
+    if (context.length == 0) {
+        //if there is no object in the intersection, i.e. no possible mutual agreement, just draw a random object
+        return uniformDraw(originalContext);
+    } else if (words.length == 0) {
+        //if we already applied all context updates, just draw a random object from the remaining 
+        return uniformDraw(context);
+    } else {
+        return flip(words[0].subjectivity) ?
+            literalListener(updateContext(context, sampleListenerExtension(context)), words.slice(1), originalContext) :
+            literalListener(updateContext(context, words[0].speakerExtension), words.slice(1), originalContext)
+    }
+}
+
+//Literal listener (L0) 
+var LL = cache(function (context, words) {
+    Infer({
+        model: function () {
+            literalListener(context, words, context)
+        }
+    })
+})
+
+
+/**
+ * Speaker (S)
+ * @param {number} object index of target object, that the speaker wants to reference
+ * @param {object[]} words vocabulary object
+ * @param {number} alpha optimality parameter 
+ */
+var speaker = function(object, words, alpha) {
+    Infer({model: function(){
+      var globalContext = sampleGlobalContext();
+      var sequence = sampleSequence(words);
+      var words_used = map(function(i) {words[i]}, sequence)
+      factor(alpha * LL(globalContext,words_used).score(object))
+      return _.toString(sequence) 
+    }})
+  }

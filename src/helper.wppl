@@ -1,0 +1,76 @@
+/**
+ * @file Helper functions
+ */
+
+
+// log without newline
+var compactLog = function (str) {
+  process.stdout.write(str)
+}
+
+// check if array is sorted
+var isSorted = function (arr) {
+  if (arr.length == 0 || arr.length == 1)
+    return true;
+  if (arr[0] <= arr[1]) {
+    return isSorted(arr.slice(1));
+  } else
+    return false;
+}
+
+
+// https://davidwalsh.name/javascript-clone-array
+var cloneArray = function (arr) {
+  // deep clone
+  return arr.slice(0)
+}
+
+// https://stackoverflow.com/a/13272437
+var replaceAllArray = function (arr, orig, repl) {
+  // a hacky way to replace all occurrences
+  return JSON.parse(JSON.stringify(arr).split(orig).join(repl))
+}
+
+
+// easier interface for js-combinatorics
+var combination = function (arr) {
+  return adjective_ordering.combination(arr).toArray()
+}
+
+var permutationCombination = function (arr) {
+  return adjective_ordering.permutationCombination(arr).toArray()
+}
+
+var permutation = function (arr) {
+  return adjective_ordering.permutation(arr).toArray()
+}
+
+var cartesianProduct = function (arr,arr2) {
+  return adjective_ordering.cartesianProduct(arr,arr2).toArray()
+}
+
+var powerSet = function (arr) {
+  return adjective_ordering.ps(arr).toArray()
+}
+
+// https://gscontras.github.io/probLang/chapters/08-lexical-uncertainty.html
+var psne = function (set) {
+  return filter(function (x) { return x.length > 0 }, powerSet(set))
+}
+
+// same as .MAP() 
+var stateMax = function(dist) {
+  return reduce(function(x,tmp){ return dist.score(x) > tmp.score ? {state: x, score: dist.score(x)} : tmp }, {score: -Infinity}, dist.support())
+}
+
+// flattens elements in an array so that we get 2D arrays from 3D ones
+var flatten  = function(arr) {
+  return map(function(x){ _.flatten(x) }, arr)
+}
+
+// toArray method for distributions
+var distToArray = function(dist) {
+  return map(function(x) {
+    return {value: x, score: dist.score(x)}
+  }, dist.support());
+}
